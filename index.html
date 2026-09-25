@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Neon Aura Surfer - Mobile Ready</title>
+    <title>Neon Aura Surfer - Final Cut</title>
     <style>
         body {
             margin: 0;
@@ -80,12 +80,12 @@
 
         const SETTINGS = {
             LANE_WIDTH: 3.5,       
-            LANE_SWITCH_SPEED: 18, 
+            LANE_SWITCH_SPEED: 22, 
             INITIAL_SPEED: 25,     
             MAX_SPEED: 70,         
             ACCELERATION: 0.15,     
-            GRAVITY: 90,           
-            JUMP_VELOCITY: 32,     
+            GRAVITY: 90,           // Restored original snappy gravity
+            JUMP_VELOCITY: 32,     // Restored original base jump height
             FAST_FALL_GRAVITY: 200,
             PLAYER_HEIGHT: 2.0,
             PLAYER_DUCK_HEIGHT: 1.0, 
@@ -94,7 +94,7 @@
             CHUNK_LENGTH: 50,      
             VISIBLE_CHUNKS: 10,     
             DESPAWN_DISTANCE: -40, 
-            ROLL_DURATION: 0.85    
+            ROLL_DURATION: 0.5     
         };
 
         class InputManager {
@@ -237,7 +237,8 @@
                     this.buffs[type].active = true;
                     this.buffs[type].timer = this.buffs[type].duration;
                     if (type === 'hoverboard') this.player.equipHoverboard();
-                    if (type === 'sneakers') this.player.jumpMultiplier = 1.6;
+                    // Scaled Sneaker Jump to feel perfectly balanced with the base jump
+                    if (type === 'sneakers') this.player.jumpMultiplier = 1.25; 
                 }
                 this.updateUI();
             }
@@ -356,7 +357,8 @@
                         if (this.currentLane < 1) { this.currentLane++; this.targetX = this.currentLane * SETTINGS.LANE_WIDTH; }
                         break;
                     case 'JUMP':
-                        if (this.isOnGround && this.state !== 'ROLL') {
+                        if (this.isOnGround) {
+                            if (this.state === 'ROLL') this.endRoll(); 
                             this.velocityY = SETTINGS.JUMP_VELOCITY * this.jumpMultiplier;
                             this.isOnGround = false; this.state = 'JUMP';
                         }
@@ -443,6 +445,9 @@
         
         const MAT_COIN = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, emissiveIntensity: 1 });
         const MAT_POWERUP = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 1.5, wireframe: true });
+        
+        // Bright glowing pillars so you can see the tollgate edges clearly
+        const MAT_PILLAR = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.8 });
 
         class WorldSpawner {
             constructor(scene) {
@@ -535,10 +540,23 @@
                     const mesh = new THREE.Mesh(new THREE.BoxGeometry(SETTINGS.LANE_WIDTH - 0.2, 1.0, 0.5), MAT_HURDLE);
                     mesh.position.y = 0.5; meshGroup.add(mesh);
                     hitbox = new THREE.Box3().setFromObject(mesh);
+                
                 } else if (type === 'SIGN') {
-                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(SETTINGS.LANE_WIDTH - 0.2, 1.5, 0.5), MAT_SIGN);
-                    mesh.position.y = 2.0; meshGroup.add(mesh);
+                    const signWidth = SETTINGS.LANE_WIDTH - 0.4;
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(signWidth, 1.5, 0.5), MAT_SIGN);
+                    mesh.position.y = 2.25; 
+                    meshGroup.add(mesh);
+                    
+                    const pGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.5);
+                    const leftP = new THREE.Mesh(pGeo, MAT_PILLAR);
+                    leftP.position.set(-signWidth/2 + 0.1, 0.75, 0);
+                    meshGroup.add(leftP);
+                    const rightP = new THREE.Mesh(pGeo, MAT_PILLAR);
+                    rightP.position.set(signWidth/2 - 0.1, 0.75, 0);
+                    meshGroup.add(rightP);
+
                     hitbox = new THREE.Box3().setFromObject(mesh);
+                
                 } else if (type === 'TRAIN') {
                     const trainLength = 9;
                     const mesh = new THREE.Mesh(new THREE.BoxGeometry(SETTINGS.LANE_WIDTH - 0.2, 3.0, trainLength), MAT_TRAIN);
@@ -549,6 +567,7 @@
                     hitbox = new THREE.Box3().setFromObject(mesh);
                     blockedLanes[lane] = 1; 
                     for(let c = -3; c <= 3; c += 2) this.buildCoin(lane, zOffset + c, 6.0, chunkGroup);
+                
                 } else if (type === 'RAMP') {
                     const rampLength = 12; const maxHeight = 6.0; 
                     const mesh = new THREE.Mesh(new THREE.BoxGeometry(SETTINGS.LANE_WIDTH - 0.2, 0.2, rampLength), MAT_RAMP);
@@ -757,7 +776,6 @@
                 this.scene.background = new THREE.Color(0x050508);
 
                 const aspect = window.innerWidth / window.innerHeight;
-                // Mobile portrait ke liye wide FOV taaki side lanes screen ke andar rahein
                 const baseFov = aspect < 1 ? 80 : 60;
                 this.camera = new THREE.PerspectiveCamera(baseFov, aspect, 0.1, 200);
 
