@@ -63,7 +63,7 @@
         <div id="hud-top-left">
             <div class="hud-text" id="scoreDisplay">SCORE: 0</div>
             <div class="hud-text" id="coinDisplay" style="color: #ffd700; text-shadow: 0 0 10px #ffaa00;">COINS: 0</div>
-            <div class="hud-text" id="boardDisplay" style="color: #bc13fe; text-shadow: 0 0 10px #bc13fe; font-size: 18px;">BOARDS: 3/10</div>
+            <div class="hud-text" id="boardDisplay" style="color: #bc13fe; text-shadow: 0 0 10px #bc13fe; font-size: 18px;">BOARDS: 0/10</div>
             <div id="buffDisplay" style="font-size: 16px; color: #ff0055; margin-top: 15px; text-shadow: 0 0 8px #ff0055;"></div>
         </div>
         <button id="pause-btn">|| PAUSE</button>
@@ -100,13 +100,13 @@
             PLAYER_WIDTH: 1.0,
             PLAYER_DEPTH: 1.0,
             CHUNK_LENGTH: 50,      
-            VISIBLE_CHUNKS: 10,     // Increased to push fog back
+            VISIBLE_CHUNKS: 10,     
             DESPAWN_DISTANCE: -40, 
             ROLL_DURATION: 0.85    
         };
 
         // ==========================================
-        // 2. INPUT MANAGER
+        // 2. BULLETPROOF INPUT MANAGER
         // ==========================================
         class InputManager {
             constructor() {
@@ -115,31 +115,42 @@
                 this.touchStartY = 0;
                 this.minSwipeDistance = 35; 
                 this.lastTapTime = 0; 
-                this.doubleTapWindow = 300; 
+                this.doubleTapWindow = 500; // Half a second for easy double taps!
 
                 this.initKeyboard();
                 this.initTouch();
+                this.initMouse(); 
             }
 
             consumeAction() { return this.actionQueue.shift() || null; }
             pushAction(action) { if (this.actionQueue.length < 2) this.actionQueue.push(action); }
 
+            initMouse() {
+                window.addEventListener('dblclick', () => {
+                    if (window.GAME_STATE === 'PLAYING') this.pushAction('HOVERBOARD');
+                });
+            }
+
             initKeyboard() {
                 window.addEventListener('keydown', (e) => {
-                    if (window.GAME_STATE !== 'PLAYING') return; // Lock inputs if paused
+                    if (window.GAME_STATE !== 'PLAYING') return; 
                     
                     if(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
                         e.preventDefault();
                     }
                     if (e.code === 'Space') {
-                        let currentTime = new Date().getTime();
-                        if (currentTime - this.lastTapTime < this.doubleTapWindow) this.pushAction('HOVERBOARD');
-                        this.lastTapTime = currentTime;
+                        let currentTime = performance.now();
+                        if (currentTime - this.lastTapTime < this.doubleTapWindow) {
+                            this.pushAction('HOVERBOARD');
+                            this.lastTapTime = 0; 
+                        } else {
+                            this.lastTapTime = currentTime;
+                        }
                     }
                     switch(e.code) {
                         case 'ArrowLeft': case 'KeyA': this.pushAction('LEFT'); break;
                         case 'ArrowRight': case 'KeyD': this.pushAction('RIGHT'); break;
-                        case 'ArrowUp': case 'KeyW': case 'Space': this.pushAction('JUMP'); break;
+                        case 'ArrowUp': case 'KeyW': this.pushAction('JUMP'); break;
                         case 'ArrowDown': case 'KeyS': this.pushAction('ROLL'); break;
                         case 'Escape': window.dispatchEvent(new Event('toggle-pause')); break;
                     }
@@ -161,9 +172,13 @@
                     let dy = e.changedTouches[0].screenY - this.touchStartY;
 
                     if (Math.abs(dx) < this.minSwipeDistance && Math.abs(dy) < this.minSwipeDistance) {
-                        let currentTime = new Date().getTime();
-                        if (currentTime - this.lastTapTime < this.doubleTapWindow) this.pushAction('HOVERBOARD');
-                        this.lastTapTime = currentTime;
+                        let currentTime = performance.now();
+                        if (currentTime - this.lastTapTime < this.doubleTapWindow) {
+                            this.pushAction('HOVERBOARD');
+                            this.lastTapTime = 0;
+                        } else {
+                            this.lastTapTime = currentTime;
+                        }
                         return; 
                     }
 
@@ -182,9 +197,11 @@
         class PowerUpManager {
             constructor(player) {
                 this.player = player;
-                this.coins = 1000; // Gave you 1000 to test the shop easily
+                
+                this.coins = parseInt(localStorage.getItem('neonSurfer_coins')) || 0;
+                this.boardStock = parseInt(localStorage.getItem('neonSurfer_boards')) || 0;
+                
                 this.score = 0;
-                this.boardStock = 3; 
                 this.maxBoards = 10;
 
                 this.buffs = {
@@ -195,17 +212,27 @@
                 this.updateUI();
             }
 
+            saveProgress() {
+                localStorage.setItem('neonSurfer_coins', this.coins);
+                localStorage.setItem('neonSurfer_boards', this.boardStock);
+            }
+
             collectCoin() {
                 this.coins += 1;
+                this.saveProgress();
                 this.updateUI();
             }
 
-            // Fire from double tap!
             useHoverboard() {
                 if (this.buffs.hoverboard.active) return; 
                 if (this.boardStock > 0) {
                     this.boardStock--;
+                    this.saveProgress();
                     this.activatePowerUp('hoverboard');
+                } else {
+                    let buffUi = document.getElementById('buffDisplay');
+                    buffUi.innerHTML = "0 BOARDS IN STOCK! BUY MORE IN PAUSE MENU!";
+                    setTimeout(() => { buffUi.innerHTML = ""; }, 2000);
                 }
             }
 
@@ -214,6 +241,7 @@
                 if (this.coins >= 300) {
                     this.coins -= 300;
                     this.boardStock++;
+                    this.saveProgress();
                     this.updateUI();
                     return true;
                 }
@@ -261,7 +289,7 @@
                 document.getElementById('scoreDisplay').innerText = `SCORE: ${Math.floor(this.score)}`;
                 document.getElementById('coinDisplay').innerText = `COINS: ${this.coins}`;
                 document.getElementById('boardDisplay').innerText = `BOARDS: ${this.boardStock}/${this.maxBoards}`;
-                if (buffText !== undefined) document.getElementById('buffDisplay').innerHTML = buffText;
+                if (buffText !== undefined && buffText !== "") document.getElementById('buffDisplay').innerHTML = buffText;
             }
         }
 
@@ -331,10 +359,10 @@
 
             revive() {
                 this.state = 'RUN';
-                this.meshGroup.rotation.x = 0; // Stand back up
-                this.meshGroup.position.y = 0;
+                this.meshGroup.rotation.x = 0; 
+                this.yViewModel = 2.0; 
                 this.velocityY = 0;
-                this.triggerInvincibility(3000); // 3 secs immunity on revive
+                this.triggerInvincibility(3000); 
             }
 
             handleInput(action) {
@@ -420,7 +448,7 @@
                 this.state = 'DEAD';
                 this.meshGroup.rotation.x = Math.PI / 2;
                 this.meshGroup.position.y = 0.3;
-                window.dispatchEvent(new Event('game-over')); // Inform Game engine
+                window.dispatchEvent(new Event('game-over')); 
             }
         }
 
@@ -435,7 +463,6 @@
         const MAT_TRAIN_NEON = new THREE.MeshBasicMaterial({ color: 0x00ffff }); 
         const MAT_RAMP = new THREE.MeshStandardMaterial({ color: 0xff0055, emissive: 0xff0055, emissiveIntensity: 0.5, wireframe: true });
         
-        // Items
         const MAT_COIN = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, emissiveIntensity: 1 });
         const MAT_POWERUP = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 1.5, wireframe: true });
 
@@ -508,7 +535,7 @@
                 mesh.rotation.x = Math.PI / 2;
                 mesh.position.set(lane * SETTINGS.LANE_WIDTH, yOffset + 0.6, zOffset);
                 chunkGroup.add(mesh);
-                mesh.userData = { type: 'COIN', isActive: true }; // No AABB needed for items anymore
+                mesh.userData = { type: 'COIN', isActive: true }; 
                 this.collidables.push(mesh);
             }
 
@@ -591,13 +618,12 @@
         }
 
         // ==========================================
-        // 6. COLLISION MANAGER (Distance-based Item Fix)
+        // 6. COLLISION MANAGER
         // ==========================================
         class CollisionManager {
             update(player, spawner, powerUps) {
                 let targetGroundY = 0; let hitFatal = false;
                 
-                // Get player center mass coordinates
                 const pPos = new THREE.Vector3(player.currentX, player.yViewModel + 1.0, 0); 
                 const pZMin = -SETTINGS.PLAYER_DEPTH / 2; const pZMax = SETTINGS.PLAYER_DEPTH / 2;
                 const pXMin = player.hitbox.min.x; const pXMax = player.hitbox.max.x;
@@ -606,13 +632,9 @@
                     if (!obj.userData.isActive) continue; 
                     let type = obj.userData.type;
 
-                    // --- FLAWLESS ITEM COLLECTION (Vector Distance) ---
                     if (type === 'COIN' || type === 'POWERUP') {
-                        // Calculate item's absolute world position
                         const itemPos = new THREE.Vector3(obj.position.x, obj.position.y, obj.parent.position.z + obj.position.z);
                         let distance = pPos.distanceTo(itemPos);
-                        
-                        // Normal grab radius is 2 meters. Magnet expands to 12 meters!
                         let grabRadius = (type === 'COIN' && powerUps.buffs.magnet.active) ? 12.0 : 2.0;
 
                         if (distance < grabRadius) {
@@ -624,7 +646,6 @@
                         continue; 
                     }
 
-                    // --- SOLID OBSTACLE COLLISION ---
                     let box = obj.userData.worldHitbox;
                     const margin = 0.2;
                     if (pXMax - margin > box.min.x && pXMin + margin < box.max.x) {
@@ -654,11 +675,11 @@
         }
 
         // ==========================================
-        // 7. MAIN ENGINE & MENU CONTROLLER
+        // 7. MAIN ENGINE & MENU CONTROLLER 
         // ==========================================
         class Game {
             constructor() {
-                window.GAME_STATE = 'PLAYING'; // PLAYING, PAUSED, DEAD
+                window.GAME_STATE = 'PLAYING'; 
                 this.initThreeJS();
                 this.setupLighting();
                 this.bindUI();
@@ -669,7 +690,6 @@
                 this.collision = new CollisionManager();
                 this.powerUps = new PowerUpManager(this.player);
 
-                // Listeners
                 window.addEventListener('hoverboard-broke', () => this.powerUps.breakHoverboard());
                 window.addEventListener('game-over', () => this.showDeathMenu());
                 window.addEventListener('toggle-pause', () => this.togglePause());
@@ -689,7 +709,7 @@
                 this.btnBuyBoard = document.getElementById('btn-buy-board');
                 
                 document.getElementById('pause-btn').addEventListener('click', () => this.togglePause());
-                document.getElementById('btn-restart').addEventListener('click', () => location.reload()); // Instant reload
+                document.getElementById('btn-restart').addEventListener('click', () => location.reload()); 
                 
                 this.btnResume.addEventListener('click', () => this.togglePause());
                 
@@ -700,9 +720,13 @@
                 this.btnRevive.addEventListener('click', () => {
                     if (this.powerUps.coins >= 500) {
                         this.powerUps.coins -= 500;
+                        this.powerUps.saveProgress();
                         this.powerUps.updateUI();
                         this.player.revive();
-                        this.togglePause(); // Unpause
+                        
+                        window.GAME_STATE = 'PLAYING';
+                        this.menuOverlay.style.display = 'none';
+                        this.lastTime = performance.now(); 
                     }
                 });
             }
@@ -731,7 +755,6 @@
                 } else {
                     window.GAME_STATE = 'PLAYING';
                     this.menuOverlay.style.display = 'none';
-                    // Reset time so physics don't warp after unpausing
                     this.lastTime = performance.now(); 
                 }
             }
@@ -758,12 +781,10 @@
 
             initThreeJS() {
                 this.scene = new THREE.Scene();
-                // Visibility fixed: Fog pushed to 140 meters out!
                 this.scene.fog = new THREE.Fog(0x050508, 40, 140); 
                 this.scene.background = new THREE.Color(0x050508);
 
                 this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-                // Camera lifted slightly for a better far-view
                 this.camera.position.set(0, 6, 9);
                 this.camera.lookAt(0, 2, -20);
 
@@ -800,7 +821,7 @@
                     let action = this.inputManager.consumeAction();
                     while (action) {
                         this.player.handleInput(action);
-                        if (action === 'HOVERBOARD') this.powerUps.useHoverboard(); // Uses stock now!
+                        if (action === 'HOVERBOARD') this.powerUps.useHoverboard(); 
                         action = this.inputManager.consumeAction();
                     }
 
