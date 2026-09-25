@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Neon Aura Surfer - Ultimate</title>
+    <title>Neon Aura Surfer - Mobile Ready</title>
     <style>
         body {
             margin: 0;
@@ -15,38 +15,35 @@
         }
         canvas { display: block; }
         
-        /* --- NEON UI STYLING --- */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
         }
         .hud-text {
-            font-size: 22px; font-weight: bold; text-shadow: 0 0 10px #00ffff; margin-bottom: 5px;
+            font-size: 20px; font-weight: bold; text-shadow: 0 0 10px #00ffff; margin-bottom: 5px;
         }
-        #hud-top-left { position: absolute; top: 20px; left: 20px; color: #00ffff; }
-        #hud-top-right { position: absolute; top: 20px; right: 20px; text-align: right; }
+        #hud-top-left { position: absolute; top: 15px; left: 15px; color: #00ffff; }
         
         #pause-btn {
-            position: absolute; top: 20px; right: 20px;
+            position: absolute; top: 15px; right: 15px;
             background: transparent; border: 2px solid #ff0055; color: #ff0055;
-            font-size: 24px; padding: 5px 15px; cursor: pointer; pointer-events: auto;
+            font-size: 20px; padding: 6px 14px; cursor: pointer; pointer-events: auto;
             box-shadow: 0 0 10px #ff0055; font-weight: bold; border-radius: 5px;
         }
         #pause-btn:hover { background: #ff0055; color: #000; }
 
-        /* OVERLAY MENU */
         #menu-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 5, 8, 0.85); display: none; 
+            background: rgba(5, 5, 8, 0.88); display: none; 
             flex-direction: column; justify-content: center; align-items: center;
-            pointer-events: auto; backdrop-filter: blur(5px);
+            pointer-events: auto; backdrop-filter: blur(6px);
         }
-        h1 { font-size: 50px; color: #bc13fe; text-shadow: 0 0 20px #bc13fe; margin-bottom: 10px; }
-        p.subtitle { color: #ffd700; font-size: 20px; margin-bottom: 30px; text-shadow: 0 0 10px #ffaa00; }
+        h1 { font-size: 40px; color: #bc13fe; text-shadow: 0 0 20px #bc13fe; margin-bottom: 10px; }
+        p.subtitle { color: #ffd700; font-size: 18px; margin-bottom: 25px; text-shadow: 0 0 10px #ffaa00; }
         
         .menu-btn {
             background: transparent; border: 2px solid #00ffff; color: #00ffff;
-            font-size: 20px; font-family: inherit; padding: 15px 40px; margin: 10px;
-            cursor: pointer; font-weight: bold; width: 300px; text-align: center;
+            font-size: 18px; font-family: inherit; padding: 12px 30px; margin: 8px;
+            cursor: pointer; font-weight: bold; width: 280px; text-align: center;
             box-shadow: 0 0 10px #00ffff; transition: 0.2s;
         }
         .menu-btn:hover { background: #00ffff; color: #000; box-shadow: 0 0 20px #00ffff; }
@@ -58,18 +55,16 @@
 </head>
 <body>
 
-    <!-- UI LAYER -->
     <div id="ui-layer">
         <div id="hud-top-left">
             <div class="hud-text" id="scoreDisplay">SCORE: 0</div>
             <div class="hud-text" id="coinDisplay" style="color: #ffd700; text-shadow: 0 0 10px #ffaa00;">COINS: 0</div>
-            <div class="hud-text" id="boardDisplay" style="color: #bc13fe; text-shadow: 0 0 10px #bc13fe; font-size: 18px;">BOARDS: 0/10</div>
-            <div id="buffDisplay" style="font-size: 16px; color: #ff0055; margin-top: 15px; text-shadow: 0 0 8px #ff0055;"></div>
+            <div class="hud-text" id="boardDisplay" style="color: #bc13fe; text-shadow: 0 0 10px #bc13fe; font-size: 16px;">BOARDS: 0/10</div>
+            <div id="buffDisplay" style="font-size: 14px; color: #ff0055; margin-top: 10px; text-shadow: 0 0 8px #ff0055;"></div>
         </div>
         <button id="pause-btn">|| PAUSE</button>
     </div>
 
-    <!-- MENU SYSTEM -->
     <div id="menu-overlay">
         <h1 id="menu-title">PAUSED</h1>
         <p class="subtitle" id="menu-stats">Coins: 0 | Score: 0</p>
@@ -83,9 +78,6 @@
     <script type="module">
         import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
 
-        // ==========================================
-        // 1. CONSTANTS
-        // ==========================================
         const SETTINGS = {
             LANE_WIDTH: 3.5,       
             LANE_SWITCH_SPEED: 18, 
@@ -105,17 +97,14 @@
             ROLL_DURATION: 0.85    
         };
 
-        // ==========================================
-        // 2. BULLETPROOF INPUT MANAGER
-        // ==========================================
         class InputManager {
             constructor() {
                 this.actionQueue = [];
                 this.touchStartX = 0;
                 this.touchStartY = 0;
-                this.minSwipeDistance = 35; 
+                this.minSwipeDistance = 30; 
                 this.lastTapTime = 0; 
-                this.doubleTapWindow = 500; // Half a second for easy double taps!
+                this.doubleTapWindow = 500; 
 
                 this.initKeyboard();
                 this.initTouch();
@@ -191,16 +180,11 @@
             }
         }
 
-        // ==========================================
-        // 3. POWER UP & ECONOMY MANAGER
-        // ==========================================
         class PowerUpManager {
             constructor(player) {
                 this.player = player;
-                
                 this.coins = parseInt(localStorage.getItem('neonSurfer_coins')) || 0;
                 this.boardStock = parseInt(localStorage.getItem('neonSurfer_boards')) || 0;
-                
                 this.score = 0;
                 this.maxBoards = 10;
 
@@ -231,7 +215,7 @@
                     this.activatePowerUp('hoverboard');
                 } else {
                     let buffUi = document.getElementById('buffDisplay');
-                    buffUi.innerHTML = "0 BOARDS IN STOCK! BUY MORE IN PAUSE MENU!";
+                    buffUi.innerHTML = "0 BOARDS! BUY IN PAUSE MENU";
                     setTimeout(() => { buffUi.innerHTML = ""; }, 2000);
                 }
             }
@@ -293,9 +277,6 @@
             }
         }
 
-        // ==========================================
-        // 4. PLAYER
-        // ==========================================
         class Player {
             constructor(scene) {
                 this.scene = scene;
@@ -452,9 +433,6 @@
             }
         }
 
-        // ==========================================
-        // 5. WORLD SPAWNER
-        // ==========================================
         const MAT_FLOOR = new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.9 }); 
         const MAT_LANE_LINE = new THREE.MeshBasicMaterial({ color: 0x00ffff }); 
         const MAT_HURDLE = new THREE.MeshStandardMaterial({ color: 0xff0055, emissive: 0xff0055, emissiveIntensity: 1, wireframe: true });
@@ -617,9 +595,6 @@
             }
         }
 
-        // ==========================================
-        // 6. COLLISION MANAGER
-        // ==========================================
         class CollisionManager {
             update(player, spawner, powerUps) {
                 let targetGroundY = 0; let hitFatal = false;
@@ -674,9 +649,6 @@
             }
         }
 
-        // ==========================================
-        // 7. MAIN ENGINE & MENU CONTROLLER 
-        // ==========================================
         class Game {
             constructor() {
                 window.GAME_STATE = 'PLAYING'; 
@@ -784,16 +756,35 @@
                 this.scene.fog = new THREE.Fog(0x050508, 40, 140); 
                 this.scene.background = new THREE.Color(0x050508);
 
-                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-                this.camera.position.set(0, 6, 9);
-                this.camera.lookAt(0, 2, -20);
+                const aspect = window.innerWidth / window.innerHeight;
+                // Mobile portrait ke liye wide FOV taaki side lanes screen ke andar rahein
+                const baseFov = aspect < 1 ? 80 : 60;
+                this.camera = new THREE.PerspectiveCamera(baseFov, aspect, 0.1, 200);
 
-                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                if (aspect < 1) {
+                    this.camera.position.set(0, 8, 12);
+                    this.camera.lookAt(0, 1, -15);
+                } else {
+                    this.camera.position.set(0, 6, 9);
+                    this.camera.lookAt(0, 2, -20);
+                }
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
                 document.body.appendChild(this.renderer.domElement);
+
                 window.addEventListener('resize', () => {
-                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    const newAspect = window.innerWidth / window.innerHeight;
+                    this.camera.aspect = newAspect;
+                    this.camera.fov = newAspect < 1 ? 80 : 60;
+                    if (newAspect < 1) {
+                        this.camera.position.set(0, 8, 12);
+                        this.camera.lookAt(0, 1, -15);
+                    } else {
+                        this.camera.position.set(0, 6, 9);
+                        this.camera.lookAt(0, 2, -20);
+                    }
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 });
